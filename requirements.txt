@@ -1,0 +1,5 @@
+Flask
+PyGithub
+matplotlib
+pandas
+skyfield
