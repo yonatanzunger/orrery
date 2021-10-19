@@ -1,11 +1,13 @@
 import logging
 import os
+import re
 import shutil
 from typing import Dict, Iterator, List, Optional, Tuple
 
 from github import Github, GithubException
 from skyfield.api import Loader
-from skyfield.data.stellarium import parse_star_names
+from skyfield.data.stellarium import \
+    StarName  # Not parse_star_names, it's broken.
 
 
 class StarNames(object):
@@ -42,13 +44,12 @@ class StarNames(object):
             culture = file.name[:-4]
             if culture not in self._byCulture:
                 self._byCulture[culture] = {}
-            with open(file.path, "rb") as data:
-                for line in parse_star_names(self._cleanLines(data)):
-                    self._byCulture[culture][line.name] = line.hip
-                    self._allStars[line.name] = line.hip
-                    if line.hip not in self._byHip:
-                        self._byHip[line.hip] = {}
-                    self._byHip[line.hip][culture] = line.name
+            for star in self._parseFAB(file.path):
+                self._byCulture[culture][star.name] = star.hip
+                self._allStars[star.name] = star.hip
+                if star.hip not in self._byHip:
+                    self._byHip[star.hip] = {"hip": f"HIP{star.hip}"}
+                self._byHip[star.hip][culture] = star.name
 
         logging.info(
             f"Loaded {len(self._allStars)} star names for {len(self._byCulture)} cultures"
@@ -93,9 +94,9 @@ class StarNames(object):
 
         logging.info(f"Finished downloading star names for cultures: {cultures}")
 
-    def _cleanLines(self, raw: Iterator[bytes]) -> Iterator[bytes]:
-        """Properly strip lines. Alas, the skyfield function doesn't handle Unicode spaces, and some
-        of the Stellarium files have them.
-        """
-        for line in raw:
-            yield line.decode('utf8').strip().encode('utf8')
+    def _parseFAB(self, filename: str) -> Iterator[StarName]:
+        with open(filename, "rt", encoding="utf8") as data:
+            for line in data:
+                match = re.match('([0-9]+)\|_\("([^"]+)"\)', line.strip())
+                if match:
+                    yield StarName(name=match[2], hip=int(match[1]))

@@ -42,15 +42,23 @@ def magnitudeFunction(
         if "magnitude_g" in dataFrame.index and "magnitude_k" in dataFrame.index:
             return _makeFnGK(dataFrame["magnitude_g"], dataFrame["magnitude_k"])
 
+        # For stars, we have a simple constant apparent magnitude.
         if "magnitude" in dataFrame.index:
-            return _makeFnAbsolute(dataFrame["magnitude"])
+            return _makeFnConstant(dataFrame["magnitude"])
 
     return None
 
 
+def _makeFnConstant(magnitude: float) -> MagnitudeFunction:
+    """Return a magnitude function whose _apparent_ magnitude is given and a constant. This is
+    appropriate for distant stars.
+    """
+    return lambda _: magnitude
+
+
 def _makeFnAbsolute(absolute: float) -> MagnitudeFunction:
     """Return a magnitude function for an object whose absolute magnitude is given as a single
-    number. This tends to work well for things like stars.
+    number. This tends to work well for luminous bodies.
     """
 
     def fromAbsoluteMagnitude(pos: Astrometric) -> float:

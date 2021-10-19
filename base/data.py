@@ -21,18 +21,25 @@ logging.getLogger().setLevel(logging.INFO)
 
 
 class Data(object):
+    """This class is the central holder for astronomical data; it acts as a wrapper around all of
+    the datasets we get from JPL, the Minor Planets Center, etc., and exposes them via nice,
+    Skyfield-friendly APIs.
+    """
+
     def __init__(self, dirname: str = "data", ephemerides: str = "de441") -> None:
         self.load = Loader(dirname)
         self._ephName = ephemerides
         if not self._ephName.endswith(".bsp"):
             self._ephName += ".bsp"
 
+    # CelestialObjects representing the most common things we might want to use.
+
     @cached_property
     def sun(self) -> CelestialObject:
         return makeObject(
             ObjectType.STAR,
             "The Sun",
-            self.ephemerides["sun"],
+            self._ephemerides["sun"],
             absoluteMagnitude=-26.74,
             symbol="\u2609",
         )
@@ -40,25 +47,25 @@ class Data(object):
     @cached_property
     def moon(self) -> CelestialObject:
         return makeObject(
-            ObjectType.MOON, "The Moon", self.ephemerides["moon"], symbol="\u263D"
+            ObjectType.MOON, "The Moon", self._ephemerides["moon"], symbol="\u263D"
         )
 
     @cached_property
     def mercury(self) -> CelestialObject:
         return makeObject(
-            ObjectType.PLANET, "Mercury", self.ephemerides["mercury"], symbol="\u263f"
+            ObjectType.PLANET, "Mercury", self._ephemerides["mercury"], symbol="\u263f"
         )
 
     @cached_property
     def venus(self) -> CelestialObject:
         return makeObject(
-            ObjectType.PLANET, "Venus", self.ephemerides["venus"], symbol="\u2640"
+            ObjectType.PLANET, "Venus", self._ephemerides["venus"], symbol="\u2640"
         )
 
     @cached_property
     def earth(self) -> CelestialObject:
         return makeObject(
-            ObjectType.PLANET, "Earth", self.ephemerides["earth"], symbol="\u2641"
+            ObjectType.PLANET, "Earth", self._ephemerides["earth"], symbol="\u2641"
         )
 
     @cached_property
@@ -66,7 +73,7 @@ class Data(object):
         return makeObject(
             ObjectType.PLANET,
             "Mars",
-            self.ephemerides["mars barycenter"],
+            self._ephemerides["mars barycenter"],
             symbol="\u2642",
         )
 
@@ -75,7 +82,7 @@ class Data(object):
         return makeObject(
             ObjectType.PLANET,
             "Jupiter",
-            self.ephemerides["jupiter barycenter"],
+            self._ephemerides["jupiter barycenter"],
             symbol="\u2643",
         )
 
@@ -84,7 +91,7 @@ class Data(object):
         return makeObject(
             ObjectType.PLANET,
             "Saturn",
-            self.ephemerides["saturn barycenter"],
+            self._ephemerides["saturn barycenter"],
             symbol="\u2644",
         )
 
@@ -93,7 +100,7 @@ class Data(object):
         return makeObject(
             ObjectType.PLANET,
             "Uranus",
-            self.ephemerides["uranus barycenter"],
+            self._ephemerides["uranus barycenter"],
             symbol="\u2645",
         )
 
@@ -102,7 +109,7 @@ class Data(object):
         return makeObject(
             ObjectType.PLANET,
             "Neptune",
-            self.ephemerides["neptune barycenter"],
+            self._ephemerides["neptune barycenter"],
             symbol="\u2646",
         )
 
@@ -114,7 +121,7 @@ class Data(object):
         return makeObject(
             ObjectType.MINOR_PLANET,
             "Pluto",
-            self.ephemerides["pluto barycenter"],
+            self._ephemerides["pluto barycenter"],
             symbol="\u2647",
         )
 
@@ -157,12 +164,12 @@ class Data(object):
     def arcturus(self) -> CelestialObject:
         return self.star("Arcturus", "western")
 
-    # Generic accessors for data
+    # More general accessors to load up other celestial bodies in our databases.
 
     def comet(self, designation: str) -> CelestialObject:
         """Look up a comet by its designation, e.g. 1P/Halley"""
         # NB: mpc.comet_orbit returns an orbit centered on the Sun, so we need to offset it!
-        row = self.comets.loc[designation]
+        row = self._comets.loc[designation]
         return makeObject(
             type=ObjectType.COMET,
             name=designation[designation.find("/") + 1 :],
@@ -174,7 +181,7 @@ class Data(object):
         self, designation: str, symbol: Optional[str] = None
     ) -> CelestialObject:
         """Look up a minor planet by its designation, e.g. (2060) Chiron"""
-        data = self.minorPlanets.loc[designation]
+        data = self._minorPlanets.loc[designation]
         shortName = designation[designation.find(") ") + 2 :]
         return makeObject(
             type=ObjectType.MINOR_PLANET,
@@ -195,14 +202,14 @@ class Data(object):
             culture: If given, use as a hint to understand the common name.
         """
         number = ref if isinstance(ref, int) else self.starNumber(ref)
-        data = self.stars.loc[number]
-        names = self.starNames.allNames(number)
+        data = self._stars.loc[number]
+        names = self._starNames.allNames(number)
         primaryName = (
             ref
             if isinstance(ref, str)
             else names["western"]
             if "western" in names
-            else f"HIP{number}"
+            else names["hip"]
         )
         star = Star.from_dataframe(data)
         return makeObject(
@@ -214,10 +221,10 @@ class Data(object):
         )
 
     def cultures(self) -> Tuple[str, ...]:
-        return self.starNames.cultures()
+        return self._starNames.cultures()
 
     def starNumber(self, name: str, culture: Optional[str] = None) -> int:
-        return self.starNames.find(name, culture=culture)
+        return self._starNames.find(name, culture=culture)
 
     # Low-level access to data objects
 
@@ -225,11 +232,11 @@ class Data(object):
     def timescale(self) -> Timescale:
         return self.load.timescale()
 
-    def at(self, when: datetime) -> Time:
-        return self.timescale.from_datetime(when)
+    #########################################################################################
+    # Much more internal accessors
 
     @cached_property
-    def comets(self) -> DataFrame:
+    def _comets(self) -> DataFrame:
         with self.load.open(mpc.COMET_URL) as f:
             return (
                 mpc.load_comets_dataframe(f)
@@ -240,11 +247,11 @@ class Data(object):
             )
 
     @cached_property
-    def ephemerides(self) -> SpiceKernel:
+    def _ephemerides(self) -> SpiceKernel:
         return self.load(self._ephName)
 
     @cached_property
-    def minorPlanets(self) -> DataFrame:
+    def _minorPlanets(self) -> DataFrame:
         with self.load.open(self._minorPlanetsPath()) as f:
             logging.info("Loading minor planets dataset")
             mp = mpc.load_MPC_ORB_dataframe(f)
@@ -254,7 +261,7 @@ class Data(object):
             return mp
 
     @cached_property
-    def stars(self) -> DataFrame:
+    def _stars(self) -> DataFrame:
         logging.info("Loading Hipparcos data")
         with self.load.open(hipparcos.URL) as f:
             df = hipparcos.load_dataframe(f)
@@ -263,7 +270,7 @@ class Data(object):
             return df
 
     @cached_property
-    def starNames(self) -> StarNames:
+    def _starNames(self) -> StarNames:
         return StarNames(self.load)
 
     # Logic for downloading data
@@ -312,8 +319,6 @@ class Data(object):
         os.remove(compressed)
 
         return self._MPC_ORB
-
-    _STELLARIUM_URL = "https://raw.githubusercontent.com/Stellarium/stellarium/master/"
 
 
 # Static global instance
