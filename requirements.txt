@@ -3,3 +3,4 @@ PyGithub
 matplotlib
 pandas
 skyfield
+googlemaps

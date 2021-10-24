@@ -1,0 +1,9 @@
+* Plot and understand direction vectors
+* Get a good solution in place for magnitudes
+  https://arxiv.org/pdf/1808.01973.pdf
+  https://sourceforge.net/projects/planetary-magnitudes/  ==> Downloaded this
+  https://skyandtelescope.org/observing/measuring-planet-magnitudes/
+  https://theskylive.com/mars-info#brightness ==> How do they do it?
+* Also: Distance, apparent diameter (in degrees), subtarget lat/long and distance from observer
+* True position (ignoring aberration and deflection) versus apparent position
+* Load frames for things other than the Earth

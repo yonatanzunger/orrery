@@ -7,15 +7,17 @@ from functools import cached_property
 from typing import Optional, Tuple, Union
 
 from pandas.core.frame import DataFrame
-from skyfield.api import Loader
+from skyfield.api import Loader, N, W, wgs84
 from skyfield.constants import GM_SUN_Pitjeva_2005_km3_s2 as GM_SUN
 from skyfield.data import hipparcos, mpc
 from skyfield.jpllib import SpiceKernel
 from skyfield.starlib import Star
 from skyfield.timelib import Time, Timescale
+from skyfield.toposlib import GeographicPosition
+from skyfield.vectorlib import VectorFunction
 
 from base._star_names import StarNames
-from base.object import CelestialObject, ObjectType, makeObject
+from base.object import CelestialObject, ObjectType, Observation, makeObject
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -164,6 +166,41 @@ class Data(object):
     def arcturus(self) -> CelestialObject:
         return self.star("Arcturus", "western")
 
+    # Observation points
+
+    # Helpers for getting positions
+    def observer(
+        self,
+        lat: float,
+        lon: float,
+        elevationMeters: Optional[float] = None,
+    ) -> VectorFunction:
+        """Return a VectorFunction representing a terrestrial observer."""
+        return self.earth.position + wgs84.latlon(lat, lon, elevation_m=elevationMeters)
+
+    @cached_property
+    def berkeley(self) -> VectorFunction:
+        return self.observer(37.8645 * N, 122.3015 * W, 52.1)
+
+    def observe(
+        self,
+        observer: VectorFunction,
+        target: CelestialObject,
+        when: Optional[datetime] = None,
+    ) -> Observation:
+        """Give the astrometric (relative) position of target relative to observer at time.
+
+        If the time is not given, assume "now."
+        """
+        time = self.timescale.from_datetime(when) if when else self.timescale.now()
+        position = observer.at(time).observe(target.position)
+        return Observation(
+            target=target,
+            position=position,
+            magnitude=target.magnitude(position),
+            subpoint=self.subpoint(target, time)
+        )
+
     # More general accessors to load up other celestial bodies in our databases.
 
     def comet(self, designation: str) -> CelestialObject:
@@ -226,11 +263,12 @@ class Data(object):
     def starNumber(self, name: str, culture: Optional[str] = None) -> int:
         return self._starNames.find(name, culture=culture)
 
-    # Low-level access to data objects
-
     @property
     def timescale(self) -> Timescale:
         return self.load.timescale()
+
+    def subpoint(self, target: CelestialObject, time: Time) -> GeographicPosition:
+        return wgs84.subpoint(self.earth.position.at(time).observe(target.position))
 
     #########################################################################################
     # Much more internal accessors
@@ -254,7 +292,7 @@ class Data(object):
     def _minorPlanets(self) -> DataFrame:
         with self.load.open(self._minorPlanetsPath()) as f:
             logging.info("Loading minor planets dataset")
-            mp = mpc.load_MPC_ORB_dataframe(f)
+            mp = mpc.load_mpcorb_dataframe(f)
             # Drop items without orbits
             badOrbits = mp.semimajor_axis_au.isnull()
             mp = mp[~badOrbits].set_index("designation", drop=False)
