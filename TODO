@@ -4,6 +4,7 @@
   https://sourceforge.net/projects/planetary-magnitudes/  ==> Downloaded this
   https://skyandtelescope.org/observing/measuring-planet-magnitudes/
   https://theskylive.com/mars-info#brightness ==> How do they do it?
-* Also: Distance, apparent diameter (in degrees), subtarget lat/long and distance from observer
-* True position (ignoring aberration and deflection) versus apparent position
+* Positions of ecliptic sectors in RA/dec/alt/az as well
+* Add apparent diameter, phase angle
 * Load frames for things other than the Earth
+* Compare magnitudes and distances to their range ==> cf searchlib and find_maxima

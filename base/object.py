@@ -10,8 +10,9 @@ from skyfield.toposlib import GeographicPosition, Geoid
 from skyfield.units import Angle, Distance
 from skyfield.vectorlib import VectorFunction
 
+from base.classical import EclipticPosition
 from base.geoid import geoDistance
-from base.magnitude import MagnitudeFunction, magnitudeFunction
+from base.magnitude import IlluminatedBody
 
 # In skyfield, you can actually observe anything that impolements _observe_from_bcrs, but (dammit
 # old code) there's no sane type signature for that.
@@ -43,18 +44,28 @@ class CelestialObject(NamedTuple):
     # A function from time to absolute (ICRF) position.
     position: Observable
 
-    # A function from an observed position to visual magnitude
-    magnitudeFunction: Optional[MagnitudeFunction]
+    # If we know something about its illumination, it's here.
+    illumination: Optional[IlluminatedBody]
 
     # A coordinate reference frame for the surface of the object, if known.
     surface: Optional[Union[Frame, Geoid]]
 
     def magnitude(self, position: Astrometric) -> Optional[float]:
         return (
-            self.magnitudeFunction(position)
-            if self.magnitudeFunction is not None
+            self.illumination.magnitude(position)
+            if self.illumination is not None
             else None
         )
+
+    @property
+    def shortLabel(self) -> str:
+        return self.symbol or self.name
+
+    @property
+    def longName(self) -> str:
+        if self.symbol:
+            return f"{self.name} ({self.symbol})"
+        return self.name
 
 
 def makeObject(
@@ -62,7 +73,6 @@ def makeObject(
     name: str,
     position: Observable,
     dataFrame: Optional[DataFrame] = None,
-    absoluteMagnitude: Optional[float] = None,
     names: Optional[Dict[str, str]] = None,
     symbol: Optional[str] = None,
     surface: Optional[Union[Frame, Geoid]] = None,
@@ -73,9 +83,7 @@ def makeObject(
         symbol=symbol,
         otherNames=names or {},
         position=position,
-        magnitudeFunction=magnitudeFunction(
-            position=position, dataFrame=dataFrame, absoluteMagnitude=absoluteMagnitude
-        ),
+        illumination=IlluminatedBody.make(position=position, dataFrame=dataFrame),
         surface=surface,
     )
 
@@ -127,5 +135,9 @@ class Observation(NamedTuple):
     @property
     def distanceToSubpoint(self) -> Distance:
         return geoDistance(self.surfaceObserver, self.subpoint)
+
+    @property
+    def classicalPosition(self) -> EclipticPosition:
+        return EclipticPosition.make(self.position.apparent())
 
     # TODO: Apparent diameter

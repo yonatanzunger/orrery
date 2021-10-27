@@ -3,7 +3,7 @@ from typing import Optional
 import numpy
 from skyfield.api import wgs84
 from skyfield.toposlib import GeographicPosition, Geoid
-from skyfield.units import Distance
+from skyfield.units import Distance, Angle
 
 
 def geoDistance(
@@ -27,8 +27,10 @@ def geoDistance(
 
     # The (spherical) central angle between the two points
     sigma = numpy.arccos(
-        numpy.sin(beta1) * numpy.sin(beta2) +
-        numpy.cos(beta1) * numpy.cos(beta2) * numpy.cos(b.longitude.radians - a.longitude.radians)
+        numpy.sin(beta1) * numpy.sin(beta2)
+        + numpy.cos(beta1)
+        * numpy.cos(beta2)
+        * numpy.cos(b.longitude.radians - a.longitude.radians)
     )
 
     # And now Lambert's equation.
@@ -46,3 +48,14 @@ def geoDistance(
     arc = sigma - (X + Y) / (2 * geoid.inverse_flattening)
 
     return Distance.from_au(geoid.radius.au * arc)
+
+
+def _markedStr(theta: Angle, plusChar: str, minusChar: str) -> str:
+    if theta.radians > 0:
+        return f"{theta.dstr()}{plusChar}"
+    alpha = Angle(radians=-theta.radians)
+    return f"{alpha.dstr()}{minusChar}"
+
+
+def latLonStr(latitude: Angle, longitude: Angle) -> str:
+    return f'{_markedStr(latitude, "N", "S")} {_markedStr(longitude, "E", "W")}'

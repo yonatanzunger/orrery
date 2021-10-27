@@ -42,7 +42,6 @@ class Data(object):
             ObjectType.STAR,
             "The Sun",
             self._ephemerides["sun"],
-            absoluteMagnitude=-26.74,
             symbol="\u2609",
         )
 
@@ -176,7 +175,9 @@ class Data(object):
         elevationMeters: Optional[float] = None,
     ) -> VectorFunction:
         """Return a VectorFunction representing a terrestrial observer."""
-        return self.earth.position + wgs84.latlon(lat, lon, elevation_m=elevationMeters)
+        return self.earth.position + wgs84.latlon(
+            lat, lon, elevation_m=elevationMeters or 0
+        )
 
     @cached_property
     def berkeley(self) -> VectorFunction:
@@ -198,7 +199,7 @@ class Data(object):
             target=target,
             position=position,
             magnitude=target.magnitude(position),
-            subpoint=self.subpoint(target, time)
+            subpoint=self.subpoint(target, time),
         )
 
     # More general accessors to load up other celestial bodies in our databases.
