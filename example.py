@@ -2,7 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from base.data import data
-from base.format import TextTable, distanceStr, latitudeStr, longitudeStr
+from base.format import TextTable, distanceStr, latitudeStr, longitudeStr, angleRateStr
 
 # import matplotlib.pyplot as plt
 
@@ -52,6 +52,7 @@ def main() -> None:
             [
                 "Ecliptic:",
                 observation.classicalPosition.classicalLongitudeStr(),
+                angleRateStr(observation.classicalPosition.latitudeRate),
                 f"Lat {observation.classicalPosition.latitude.dstr()}",
             ]
         )

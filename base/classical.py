@@ -2,7 +2,7 @@ from typing import NamedTuple, Tuple
 
 from skyfield.framelib import ecliptic_frame
 from skyfield.positionlib import ICRF
-from skyfield.units import Angle
+from skyfield.units import Angle, AngleRate
 
 
 class Zodiac(NamedTuple):
@@ -28,12 +28,14 @@ ZODIAC = (
 
 class EclipticPosition(NamedTuple):
     latitude: Angle
+    latitudeRate: AngleRate
     longitude: Angle
+    longitudeRate: AngleRate
 
     @classmethod
     def make(cls, pos: ICRF) -> "EclipticPosition":
-        lat, lon, _ = pos.frame_latlon(ecliptic_frame)
-        return EclipticPosition(lat, lon)
+        lat, lon, _, latR, lonR, __ = pos.frame_latlon_and_rates(ecliptic_frame)
+        return EclipticPosition(lat, latR, lon, lonR)
 
     @property
     def classicalLongitude(self) -> Tuple[Zodiac, float]:

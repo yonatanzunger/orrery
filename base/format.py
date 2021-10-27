@@ -2,7 +2,7 @@ import io
 import math
 from typing import List
 
-from skyfield.units import Angle, Distance
+from skyfield.units import Angle, AngleRate, Distance
 
 
 def _markedStr(theta: Angle, plusChar: str, minusChar: str) -> str:
@@ -42,6 +42,24 @@ def distanceStr(d: Distance) -> str:
             return f"{pc:0.2f}pc"
         else:
             return f"{int(pc)}pc"
+
+
+def angleRateStr(r: AngleRate) -> str:
+    # TODO make this into AngleRate.__str__.
+    rate = r.degrees.per_day
+    if rate > 0:
+        sign = "+"
+    else:
+        sign = "-"
+        rate = -rate
+    degrees = int(rate)
+    rate = 60 * (rate - degrees)
+    minutes = int(rate)
+    rate = 60 * (rate - minutes)
+    seconds = int(rate)
+    mas = int(1000 * (rate - seconds))
+
+    return f"{sign}{degrees}°{minutes:02d}'{seconds:02d}.{mas:03d}\"/day"
 
 
 class TextTable(object):
