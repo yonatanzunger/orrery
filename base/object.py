@@ -2,24 +2,16 @@ from enum import Enum
 from typing import Dict, NamedTuple, Optional, Tuple, Union
 
 from pandas.core.frame import DataFrame
-from skyfield.planetarylib import Frame, PlanetTopos
+from skyfield.planetarylib import Frame
 from skyfield.positionlib import Astrometric, Barycentric
-from skyfield.starlib import Star
 from skyfield.timelib import Time
 from skyfield.toposlib import GeographicPosition, Geoid
 from skyfield.units import Angle, Distance
-from skyfield.vectorlib import VectorFunction
 
 from base.classical import EclipticPosition
 from base.geoid import geoDistance
-from base.magnitude import IlluminatedBody
-
-# In skyfield, you can actually observe anything that impolements _observe_from_bcrs, but (dammit
-# old code) there's no sane type signature for that.
-Observable = Union[VectorFunction, Star]
-
-# A local position on some body in space. Why are these classes separate, exactly?
-LocalPosition = Union[GeographicPosition, PlanetTopos]
+from base.magnitude import IlluminatedBody, ReflectingBody
+from base.types import Observable
 
 
 class ObjectType(Enum):
@@ -56,6 +48,17 @@ class CelestialObject(NamedTuple):
             if self.illumination is not None
             else None
         )
+
+    # TODO: Figure out a nice way to capture magnitude ranges. There are "special" events that
+    # occasionally take a body way out of its characteristic range, so we really want to see its (1,
+    # 99)th percentile ranges and baseline against those, and then mark "exceptional" magnitudes
+    # outside that range. But of course the periodicity of that is tied to the mutual periodicity of
+    # the observer and the observed, and the three reflection parameters are far from independent.
+    # The best solution is probably to consider the two periods P1 and P2 of observer and observed,
+    # and the ratio r=max(P1, P2)/min(P1, P2). Pick N so that the decimal part of N*r <= some fixed
+    # value, which means we're covering a decent approximation of all the possible relative
+    # positions of the two bodies. Sample over N periods (i.e. N max(P1, P2)) with a resolution of
+    # maybe 1/100 min(P1, P2)?
 
     @property
     def shortLabel(self) -> str:
@@ -139,5 +142,11 @@ class Observation(NamedTuple):
     @property
     def classicalPosition(self) -> EclipticPosition:
         return EclipticPosition.make(self.position.apparent())
+
+    @property
+    def phaseAngle(self) -> Optional[Angle]:
+        if isinstance(self.target.illumination, ReflectingBody):
+            return self.target.illumination.phaseAngle(self.position)
+        return None
 
     # TODO: Apparent diameter

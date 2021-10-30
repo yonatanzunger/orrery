@@ -183,6 +183,9 @@ class Data(object):
     def berkeley(self) -> VectorFunction:
         return self.observer(37.8645 * N, 122.3015 * W, 52.1)
 
+    def asTime(self, when: datetime) -> Time:
+        return self.timescale.from_datetime(when)
+
     def observe(
         self,
         observer: VectorFunction,

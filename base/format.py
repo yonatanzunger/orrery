@@ -62,6 +62,19 @@ def angleRateStr(r: AngleRate) -> str:
     return f"{sign}{degrees}°{minutes:02d}'{seconds:02d}.{mas:03d}\"/day"
 
 
+def phaseAngleStr(a: Angle) -> str:
+    deg = a.degrees
+    pct = int((deg if deg <= 180 else 360-deg) / 1.8)
+    if pct < 10:
+        return f"New ({pct}%)"
+    elif pct > 90:
+        return f"Full ({pct}%)"
+    elif deg < 180:
+        return f"Waxing ({pct}%)"
+    else:
+        return f"Waning ({pct}%)"
+
+
 class TextTable(object):
     def __init__(
         self, minWidth: int = 0, exceptFirstColumns: int = 0, minSpace: int = 2

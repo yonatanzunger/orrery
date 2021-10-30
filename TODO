@@ -8,3 +8,6 @@
 * Add apparent diameter, phase angle
 * Load frames for things other than the Earth
 * Compare magnitudes and distances to their range ==> cf searchlib and find_maxima
+
+* Plot of ecliptic longitudes over time, and of magnitudes over time as well! Mark the Y-axis with
+  the constellation boundaries.

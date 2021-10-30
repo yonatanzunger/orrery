@@ -2,12 +2,12 @@ import math
 from typing import Callable, Dict, List, NamedTuple, Optional
 
 from pandas.core.frame import DataFrame
-from skyfield.constants import DEG2RAD
+from skyfield.constants import DEG2RAD, RAD2DEG
 from skyfield.functions import angle_between, length_of
-from skyfield.magnitudelib import _FUNCTIONS, planetary_magnitude
 from skyfield.positionlib import Astrometric
-from skyfield.units import Distance
+from skyfield.units import Angle
 from skyfield.vectorlib import VectorFunction
+
 
 # A MagnitudeFunction is something that goes from an astrometric distance (i.e. a distance from an
 # observer) to an apparent magnitude.
@@ -20,18 +20,6 @@ LOG_AU_TO_PC = math.log10(math.pi / 648000)
 class IlluminatedBody(object):
     def magnitude(self, position: Astrometric) -> Optional[float]:
         """Return the apparent magnitude of the object."""
-        return None
-
-    def dimmest(self) -> Optional[float]:
-        """Return the minimum magnitude that this object may have from any observer in Earth
-        orbit.
-        """
-        return None
-
-    def brightest(self) -> Optional[float]:
-        """Return the maximum magnitude that this object may have from any observer in Earth
-        orbit.
-        """
         return None
 
     @classmethod
@@ -79,12 +67,6 @@ class DistantLuminousBody(IlluminatedBody):
     def magnitude(self, position: Astrometric) -> Optional[float]:
         return self._m
 
-    def dimmest(self) -> Optional[float]:
-        return self._m
-
-    def brightest(self) -> Optional[float]:
-        return self._m
-
 
 class ProximateLuminousBody(IlluminatedBody):
     """A good subclass for luminous bodies where distance variation matters, like the Sun."""
@@ -106,7 +88,7 @@ class ReflectionParameters(NamedTuple):
     r: float
     # δ is the distance between the observer and the object, in AU.
     delta: float
-    # α is the phase angle of the object, in radians.
+    # α is the phase angle of the object, in degrees.
     alpha: float
 
     @classmethod
@@ -121,7 +103,7 @@ class ReflectionParameters(NamedTuple):
             position=position,
             r=length_of(sunToPlanet),
             delta=length_of(observerToPlanet),
-            alpha=angle_between(-sunToPlanet, -observerToPlanet),
+            alpha=angle_between(-sunToPlanet, -observerToPlanet) * RAD2DEG,
         )
 
     @property
@@ -149,6 +131,10 @@ class ReflectingBody(IlluminatedBody):
         q = self.q(params)
         return q + params.distanceFactor if q is not None else None
 
+    def phaseAngle(self, position: Astrometric) -> Angle:
+        """Return the phase angle of the object."""
+        return Angle(degrees=ReflectionParameters.make(position).alpha)
+
 
 def _polynomial(x: float, coefficients: List[float]) -> float:
     """Evaluate Σa_n x^n. Useful since most q's are polynomials!"""
@@ -158,6 +144,10 @@ def _polynomial(x: float, coefficients: List[float]) -> float:
         acc += coefficient * xx
         xx *= x
     return acc
+
+
+# Models for planetary magnitude. See https://arxiv.org/pdf/1808.01973.pdf. (And yes, in all of
+# these polynomials, α is indeed in degrees!)
 
 
 class Mercury(ReflectingBody):
@@ -178,7 +168,7 @@ class Mercury(ReflectingBody):
 
 class Venus(ReflectingBody):
     def q(self, params: ReflectionParameters) -> Optional[float]:
-        if params.alpha < 163.7 * DEG2RAD:
+        if params.alpha < 163.7:
             return _polynomial(
                 params.alpha, [-4.384, -1.044e-3, 3.687e-4, -2.814e-6, 8.938e-9]
             )
@@ -193,9 +183,9 @@ class Earth(ReflectingBody):
 
 class Mars(ReflectingBody):
     def q(self, params: ReflectionParameters) -> Optional[float]:
-        if params.alpha <= 50 * DEG2RAD:
+        if params.alpha <= 50:
             return _polynomial(params.alpha, [-1.601, 2.267e-2, -1.302e-4])
-        elif params.alpha <= 120 * DEG2RAD:
+        elif params.alpha <= 120:
             return _polynomial(params.alpha, [-1.601 + 1.234, -2.573e-2, 3.445e-4])
         else:
             return None
@@ -203,11 +193,11 @@ class Mars(ReflectingBody):
 
 class Jupiter(ReflectingBody):
     def q(self, params: ReflectionParameters) -> Optional[float]:
-        if params.alpha < 12 * DEG2RAD:
+        if params.alpha < 12:
             return _polynomial(params.alpha, [-9.395, -3.7e-4, 6.16e-4])
         else:
             poly = _polynomial(
-                params.alpha / math.pi, [1, -1.507, -0.363, -0.062, 2.809, -1.876]
+                params.alpha / 180, [1, -1.507, -0.363, -0.062, 2.809, -1.876]
             )
             return -9.395 - 0.033 - 2.5 * math.log10(poly)
 
@@ -216,12 +206,12 @@ class Saturn(ReflectingBody):
     def q(self, params: ReflectionParameters) -> Optional[float]:
         alpha_factor: float
         beta = 0  # XXX TODO
-        if params.alpha < 6.5 * DEG2RAD:
+        if params.alpha < 6.5:
             beta_factor = math.sin(beta) * (
                 1.825 - 0.378 * math.exp(-2.25 * params.alpha)
             )
             return -8.914 + 2.6e-2 * params.alpha + beta_factor
-        elif params.alpha < 150 * DEG2RAD:
+        elif params.alpha < 150:
             return _polynomial(
                 params.alpha, [-8.914 + 0.026, 2.446e-4, 2.672e-2, -1.505e-6, 4.767e-9]
             )
@@ -234,7 +224,7 @@ class Uranus(ReflectingBody):
     def q(self, params: ReflectionParameters) -> Optional[float]:
         # TODO Compute phi'
         phiprime = 0.0
-        if params.alpha < 3.1 * DEG2RAD:
+        if params.alpha < 3.1:
             return -8.4e-4 * phiprime + _polynomial(
                 params.alpha, [-7.110, 6.587e-3, 1.045e-4]
             )
@@ -244,7 +234,7 @@ class Uranus(ReflectingBody):
 class Neptune(ReflectingBody):
     def q(self, params: ReflectionParameters) -> Optional[float]:
         if (
-            params.alpha < 133 * DEG2RAD
+            params.alpha < 133
             and params.position.t is not None
             and params.position.t.utc_datetime().year >= 2000
         ):
@@ -263,7 +253,7 @@ class HGReflectingBody(ReflectingBody):
         self.g = g
 
     def q(self, params: ReflectionParameters) -> Optional[float]:
-        halfTan = math.tan(0.5 * params.alpha)
+        halfTan = math.tan(0.5 * params.alpha * DEG2RAD)
         phi1 = math.exp(-3.33 * math.pow(halfTan, 0.63))
         phi2 = math.exp(-1.87 * math.pow(halfTan, 1.22))
         angleFactor = -2.5 * math.log((1 - self.g) * phi1 + self.g * phi2)
